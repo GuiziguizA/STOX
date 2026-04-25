@@ -364,3 +364,4 @@ async def get_analyses():
 @router.get("/health", summary="Health check")
 async def health():
     return {"status": "ok", "timestamp": datetime.utcnow().isoformat()}
+
