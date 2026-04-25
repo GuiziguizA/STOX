@@ -80,6 +80,33 @@ def _key_metrics(data: dict, r, s, f, v) -> dict:
     }
 
 
+_SUGGESTION_EXCLUDED = {"INDEX", "CURRENCY", "CRYPTOCURRENCY", "FUTURE", "OPTION"}
+
+
+async def _find_suggestions(ticker: str) -> list[dict]:
+    """Cherche des tickers proches via yfinance search pour suggérer des corrections."""
+    try:
+        loop = asyncio.get_running_loop()
+        results = await loop.run_in_executor(
+            None, lambda: yf.Search(ticker, max_results=5).quotes
+        )
+        suggestions = []
+        for item in (results or []):
+            symbol = item.get("symbol", "")
+            if not symbol or symbol.upper() == ticker.upper():
+                continue
+            type_ = (item.get("quoteType") or "").upper()
+            if type_ in _SUGGESTION_EXCLUDED:
+                continue
+            name = item.get("shortname") or item.get("longname") or symbol
+            suggestions.append({"symbol": symbol, "name": name})
+            if len(suggestions) >= 3:
+                break
+        return suggestions
+    except Exception:
+        return []
+
+
 @router.get(
     "/analyze/{ticker}",
     response_model=AnalysisResponse,
@@ -101,7 +128,7 @@ async def analyze(ticker: str):
         raise HTTPException(status_code=400, detail="Ticker invalide.")
 
     try:
-        data = await asyncio.get_event_loop().run_in_executor(
+        data = await asyncio.get_running_loop().run_in_executor(
             None, scrape_ticker, ticker
         )
     except ValueError as e:
@@ -167,13 +194,23 @@ async def analyze_stream(ticker: str):
         await asyncio.sleep(0)
 
         try:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             scrape_data = await loop.run_in_executor(None, scrape_ticker, ticker)
         except ValueError as e:
-            yield send("error", str(e), 0, {"error": str(e)})
+            suggestions = await _find_suggestions(ticker)
+            if suggestions:
+                labels = ", ".join(s["symbol"] for s in suggestions)
+                user_msg = f"Ticker « {ticker} » non reconnu. Vouliez-vous dire : {labels} ?"
+            else:
+                user_msg = f"Ticker « {ticker} » non reconnu. Vérifiez l'orthographe (ex : AAPL et non APPL)."
+            yield send("error", user_msg, 0, {
+                "error": str(e),
+                "user_message": user_msg,
+                "suggestions": suggestions,
+            })
             return
         except Exception as e:
-            yield send("error", f"Erreur scraping : {e}", 0, {"error": str(e)})
+            yield send("error", f"Erreur lors de l'analyse de « {ticker} » : {e}", 0, {"error": str(e)})
             return
 
         yield send("scraping", f"Données récupérées pour {scrape_data['company_name']}", 25)
