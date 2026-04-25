@@ -1,0 +1,12 @@
+# Variables d'environnement — ne jamais commiter
+.env
+.env.*
+!.env.example
+
+# Docker
+.docker/
+
+# Éditeurs
+.idea/
+.vscode/
+*.swp
