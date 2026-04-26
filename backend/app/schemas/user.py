@@ -86,3 +86,37 @@ class UserOut(BaseModel):
             roles=roles,
             permissions=sorted(perms),
         )
+
+
+class ProfileUpdateIn(BaseModel):
+    first_name: str | None = None
+    last_name: str | None = None
+    locale: str | None = None
+    timezone: str | None = None
+
+
+class UserUpdateIn(BaseModel):
+    email: EmailStr | None = None
+    profile: ProfileUpdateIn | None = None
+
+
+class UserStatusUpdateIn(BaseModel):
+    status: UserStatus
+
+    @field_validator("status")
+    @classmethod
+    def no_pending_via_patch(cls, v: UserStatus) -> UserStatus:
+        if v == UserStatus.pending:
+            raise ValueError("Le statut 'pending' n'est pas assignable manuellement")
+        return v
+
+
+class UserRolesUpdateIn(BaseModel):
+    role_codes: list[str]
+
+
+class UserInviteIn(BaseModel):
+    email: EmailStr
+    first_name: str | None = None
+    last_name: str | None = None
+    role_codes: list[str] = []
