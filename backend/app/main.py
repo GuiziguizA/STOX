@@ -4,6 +4,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from api.routes import router as analyze_router
 from app.api.v1 import auth as auth_router
 from app.api.v1 import gdpr as gdpr_router
 from app.api.v1 import purge as purge_router
@@ -62,6 +63,7 @@ async def healthcheck() -> dict:
     return {"status": "ok", "env": settings.app_env}
 
 
+app.include_router(analyze_router)
 app.include_router(auth_router.router, prefix="/api/v1")
 app.include_router(users_router.router, prefix="/api/v1")
 app.include_router(roles_router.router, prefix="/api/v1")
