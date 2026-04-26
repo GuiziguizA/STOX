@@ -73,6 +73,23 @@ services:
       retries: 5
       start_period: 5s
 
+  # ── Frontend Next.js (stub) ─────────────────────────────────────────────────
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: projet_action_web
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    env_file:
+      - .env
+    networks:
+      - app-net
+    depends_on:
+      api:
+        condition: service_healthy
+
   # ── Adminer (inspecteur DB) — profil tools ──────────────────────────────────
   adminer:
     image: adminer:latest
