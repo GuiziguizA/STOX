@@ -1,18 +1,57 @@
-import os
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-def get_database_url() -> str:
-    url = os.getenv("DATABASE_URL")
-    if url:
-        return url
-    host = os.getenv("POSTGRES_HOST", "db")
-    port = os.getenv("POSTGRES_PORT", "5432")
-    db = os.getenv("POSTGRES_DB", "projet_action")
-    user = os.getenv("POSTGRES_USER", "postgres")
-    password = os.getenv("POSTGRES_PASSWORD", "changeme")
-    return f"postgresql://{user}:{password}@{host}:{port}/{db}"
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+    # PostgreSQL
+    postgres_host: str = "db"
+    postgres_port: int = 5432
+    postgres_db: str = "projet_action"
+    postgres_user: str = "postgres"
+    postgres_password: str = "changeme"
+    database_url: str = ""
+
+    # Redis
+    redis_url: str = "redis://cache:6379/0"
+
+    # App
+    app_env: str = "development"
+    log_level: str = "info"
+    secret_key: str = "change_me_with_a_random_32_byte_hex_string"
+
+    # CORS — origines Next.js autorisées
+    cors_origins: list[str] = ["http://localhost:3000"]
+
+    # Session cookie
+    session_cookie_name: str = "cc_session"
+    session_max_age_seconds: int = 60 * 60 * 24 * 30  # 30 jours
+    session_idle_seconds: int = 60 * 60 * 24  # 24h
+
+    # CSRF
+    csrf_cookie_name: str = "cc_csrf"
+    csrf_header_name: str = "x-csrf-token"
+
+    @property
+    def async_database_url(self) -> str:
+        if self.database_url:
+            url = self.database_url
+            if url.startswith("postgresql://"):
+                return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+            return url
+        return (
+            f"postgresql+asyncpg://{self.postgres_user}:{self.postgres_password}"
+            f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
+        )
+
+    @property
+    def is_production(self) -> bool:
+        return self.app_env == "production"
 
 
-DATABASE_URL: str = get_database_url()
-REDIS_URL: str = os.getenv("REDIS_URL", "redis://cache:6379/0")
-APP_ENV: str = os.getenv("APP_ENV", "development")
+settings = Settings()
