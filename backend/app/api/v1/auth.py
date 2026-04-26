@@ -35,7 +35,7 @@ from app.schemas.auth import (
 from app.schemas.common import MessageOut
 from app.schemas.user import UserOut
 from app.services.audit import record_audit_event
-from app.services.email import send_password_reset_email, send_verification_email
+from app.services.email import send_password_reset_email, send_verification_email, send_welcome_email
 from app.services.session import (
     clear_auth_cookies,
     create_session,
@@ -301,12 +301,26 @@ async def verify_email(
 
     result_user = await db.execute(select(User).where(User.id == ev.user_id))
     user = result_user.scalar_one()
+    was_pending = user.status == UserStatus.pending
     user.email_verified_at = _now()
-    if user.status == UserStatus.pending:
+    if was_pending:
         user.status = UserStatus.active
 
     await record_audit_event(db, AuditEventType.user_email_verified, actor_id=user.id, target_id=user.id)
     await db.commit()
+
+    if was_pending:
+        from sqlalchemy.orm import selectinload
+        result2 = await db.execute(
+            select(User).where(User.id == user.id).options(selectinload(User.profile))
+        )
+        u2 = result2.scalar_one()
+        first_name = u2.profile.first_name if u2.profile else None
+        try:
+            await send_welcome_email(user.email, first_name)
+        except Exception:
+            pass
+
     return MessageOut(message="Email vérifié")
 
 

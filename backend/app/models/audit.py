@@ -28,6 +28,8 @@ class AuditEventType(str, enum.Enum):
     session_created = "session.created"
     session_revoked = "session.revoked"
     session_expired = "session.expired"
+    user_data_exported = "user.data_exported"
+    user_delete_requested = "user.delete_requested"
 
 
 class AuditLog(Base):

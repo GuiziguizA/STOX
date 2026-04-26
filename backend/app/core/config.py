@@ -37,6 +37,17 @@ class Settings(BaseSettings):
     csrf_cookie_name: str = "cc_csrf"
     csrf_header_name: str = "x-csrf-token"
 
+    # Email — Resend
+    resend_api_key: str = ""
+    email_from: str = "noreply@exemple.fr"
+    email_reply_to: str = "support@exemple.fr"
+
+    # Frontend
+    frontend_url: str = "http://localhost:3000"
+
+    # Cron jobs purge
+    cron_secret: str = ""
+
     @property
     def async_database_url(self) -> str:
         if self.database_url:

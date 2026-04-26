@@ -17,7 +17,7 @@ from app.models.user import Profile, Role, User, UserRole, UserStatus
 from app.schemas.common import MessageOut, PaginatedOut
 from app.schemas.user import UserInviteIn, UserOut, UserRolesUpdateIn, UserStatusUpdateIn, UserUpdateIn
 from app.services.audit import record_audit_event
-from app.services.email import send_invite_email
+from app.services.email import send_invite_email, send_suspension_email
 from app.services.session import revoke_all_sessions
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -257,6 +257,7 @@ async def update_user_status(
     }
 
     old_status = user.status
+    target_email = str(user.email)
     user.status = body.status
     user.updated_at = _now()
 
@@ -276,6 +277,12 @@ async def update_user_status(
         ip_address=_client_ip(request),
     )
     await db.commit()
+
+    if body.status == UserStatus.suspended:
+        try:
+            await send_suspension_email(target_email)
+        except Exception:
+            pass
 
     full_user = await _get_full_user_or_404(db, user_id)
     return UserOut.from_user(full_user)
