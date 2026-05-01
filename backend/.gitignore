@@ -23,3 +23,13 @@ analyses_history.json
 dist/
 build/
 *.egg-info/
+
+# Virtual env
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp

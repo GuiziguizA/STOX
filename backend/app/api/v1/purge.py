@@ -8,6 +8,7 @@ Jobs exécutés :
   - Purge password_reset_tokens expirés > 30 jours
   - Purge auth_sessions révoquées > 90 jours
 """
+import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
@@ -32,8 +33,9 @@ async def _verify_cron(authorization: str = Header(default="")) -> None:
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="CRON_SECRET non configuré",
         )
+    # Comparaison time-safe pour éviter le leak de timing sur le secret.
     expected = f"Bearer {settings.cron_secret}"
-    if authorization != expected:
+    if not secrets.compare_digest(authorization.encode("utf-8"), expected.encode("utf-8")):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Accès refusé")
 
 

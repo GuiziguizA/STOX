@@ -1,7 +1,10 @@
 """Routes admin users — /users/*  (require_permission)"""
+import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Annotated
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import and_, func, or_, select, update
@@ -282,7 +285,7 @@ async def update_user_status(
         try:
             await send_suspension_email(target_email)
         except Exception:
-            pass
+            logger.exception("Echec envoi suspension email a %s", target_email)
 
     full_user = await _get_full_user_or_404(db, user_id)
     return UserOut.from_user(full_user)

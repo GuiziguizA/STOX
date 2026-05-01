@@ -3,6 +3,7 @@ Module de scraping des données financières via yfinance.
 Cache 24h pour éviter les re-scraping excessifs.
 """
 import json
+import logging
 import time
 from datetime import datetime, timedelta
 from itertools import zip_longest
@@ -10,6 +11,8 @@ from pathlib import Path
 from typing import Any, Optional
 
 import yfinance as yf
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Cache en mémoire + fichier JSON (TTL 24h)
@@ -45,7 +48,7 @@ def _load_cache(ticker: str) -> Optional[dict]:
                 _MEMORY_CACHE[key] = raw
                 return raw["data"]
         except Exception:
-            pass
+            logger.warning("Cache yfinance corrompu pour %s : %s", key, path, exc_info=True)
     return None
 
 
@@ -58,7 +61,7 @@ def _save_cache(ticker: str, data: dict) -> None:
             json.dumps(entry, ensure_ascii=False, default=str), encoding="utf-8"
         )
     except Exception:
-        pass
+        logger.warning("Echec ecriture cache yfinance pour %s", key, exc_info=True)
 
 
 # ---------------------------------------------------------------------------
@@ -310,6 +313,7 @@ def scrape_ticker(ticker: str) -> dict:
             dividend_history = []
             div_history_years = []
     except Exception:
+        logger.warning("Echec recuperation dividendes pour %s", ticker, exc_info=True)
         dividend_history = []
         div_history_years = []
 

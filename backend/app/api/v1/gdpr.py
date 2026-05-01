@@ -1,4 +1,5 @@
-"""Routes RGPD — /users/me/delete-account + /users/me/export"""
+"""Routes self-service utilisateur — /users/me/* (delete-account, export, password)"""
+import logging
 from datetime import datetime, timezone
 from typing import Annotated
 
@@ -9,13 +10,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
 from app.core.deps import get_current_session, get_current_user, require_csrf
+from app.core.security import hash_password, verify_password
 from app.models.audit import AuditEventType, AuditLog
 from app.models.auth import AuthSession
 from app.models.user import Profile, User, UserStatus
+from app.schemas.auth import PasswordChangeIn
 from app.schemas.common import MessageOut
 from app.services.audit import record_audit_event
 from app.services.email import send_deletion_email
 from app.services.session import clear_auth_cookies, revoke_all_sessions
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/users/me", tags=["gdpr"])
 
@@ -70,7 +75,7 @@ async def delete_account(
     try:
         await send_deletion_email(original_email)
     except Exception:
-        pass
+        logger.exception("Echec envoi deletion email a %s", original_email)
 
     clear_auth_cookies(response)
     return MessageOut(message="Compte supprimé. Vous serez déconnecté.")
@@ -156,3 +161,57 @@ async def export_data(
             "Content-Type": "application/json",
         },
     )
+
+
+# ── PATCH /users/me/password ──────────────────────────────────────────────────
+
+@router.patch("/password", response_model=MessageOut)
+async def change_password(
+    body: PasswordChangeIn,
+    request: Request,
+    user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AuthSession, Depends(get_current_session)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _csrf: Annotated[None, Depends(require_csrf)],
+) -> MessageOut:
+    """Change le mot de passe de l'utilisateur connecté.
+
+    Exige le mot de passe actuel pour empêcher un attaquant ayant un cookie de session
+    actif (ex: XSS, machine non verrouillée) de prendre le contrôle du compte de façon
+    persistante. Toutes les autres sessions sont révoquées par sécurité.
+    """
+    if not verify_password(body.current_password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Mot de passe actuel incorrect",
+        )
+    if body.current_password == body.new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Le nouveau mot de passe doit être différent de l'ancien",
+        )
+
+    user.password_hash = hash_password(body.new_password)
+    user.updated_at = _now()
+
+    # Révoquer les autres sessions (préserver la session courante).
+    other_sessions_result = await db.execute(
+        select(AuthSession).where(
+            AuthSession.user_id == user.id,
+            AuthSession.id != session.id,
+            AuthSession.revoked_at.is_(None),
+        )
+    )
+    for other in other_sessions_result.scalars().all():
+        other.revoked_at = _now()
+
+    await record_audit_event(
+        db,
+        AuditEventType.user_password_changed,
+        actor_id=user.id,
+        target_id=user.id,
+        ip_address=_client_ip(request),
+    )
+    await db.commit()
+
+    return MessageOut(message="Mot de passe changé. Les autres sessions ont été déconnectées.")

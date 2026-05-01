@@ -3,13 +3,19 @@ Routes FastAPI pour l'API d'analyse financière.
 """
 import asyncio
 import json
+import logging
 import time
-from datetime import datetime
-from typing import AsyncGenerator
+from datetime import datetime, timezone
+from typing import Annotated, AsyncGenerator
 
 import yfinance as yf
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
+
+from app.core.deps import get_current_user
+from app.models.user import User
+
+logger = logging.getLogger(__name__)
 
 from analysis import flux, rentabilite, solidite, valorisation
 from models.schemas import AnalysisResponse, ErrorResponse, GlobalScore
@@ -104,6 +110,7 @@ async def _find_suggestions(ticker: str) -> list[dict]:
                 break
         return suggestions
     except Exception:
+        logger.warning("Echec yfinance suggestions pour %s", ticker, exc_info=True)
         return []
 
 
@@ -122,7 +129,10 @@ async def _find_suggestions(ticker: str) -> list[dict]:
         "avec les zones de valorisation selon le framework analyse_entreprise."
     ),
 )
-async def analyze(ticker: str):
+async def analyze(
+    ticker: str,
+    _user: Annotated[User, Depends(get_current_user)],
+):
     ticker = ticker.upper().strip()
     if not ticker or len(ticker) > 10:
         raise HTTPException(status_code=400, detail="Ticker invalide.")
@@ -174,13 +184,16 @@ async def analyze(ticker: str):
         "d'une barre de progression côté frontend."
     ),
 )
-async def analyze_stream(ticker: str):
+async def analyze_stream(
+    ticker: str,
+    _user: Annotated[User, Depends(get_current_user)],
+):
     ticker = ticker.upper().strip()
     if not ticker or len(ticker) > 10:
         raise HTTPException(status_code=400, detail="Ticker invalide.")
 
     async def event_stream() -> AsyncGenerator[str, None]:
-        def send(step: str, message: str, progress: int, data: dict = None) -> str:
+        def send(step: str, message: str, progress: int, data: dict | None = None) -> str:
             payload = {"step": step, "message": message, "progress": progress}
             if data:
                 payload["data"] = data
@@ -317,7 +330,10 @@ _SEARCH_EXCLUDED_TYPES = {"INDEX", "CURRENCY", "CRYPTOCURRENCY", "FUTURE", "OPTI
         "Permet de trouver 'ATE.PA' en tapant 'alten', ou 'LVMH.PA' en tapant 'LVMH'."
     ),
 )
-async def search(q: str = Query(..., min_length=1, max_length=100, description="Nom ou symbole à rechercher")):
+async def search(
+    _user: Annotated[User, Depends(get_current_user)],
+    q: str = Query(..., min_length=1, max_length=100, description="Nom ou symbole à rechercher"),
+):
     q = q.strip()
     if not q:
         return {"results": []}
@@ -325,9 +341,7 @@ async def search(q: str = Query(..., min_length=1, max_length=100, description="
         loop = asyncio.get_event_loop()
         raw = await loop.run_in_executor(None, lambda: yf.Search(q, max_results=10).quotes)
     except Exception as exc:
-        # Logger l'erreur mais retourner une liste vide plutôt qu'une 500
-        import logging
-        logging.getLogger(__name__).warning("yf.Search('%s') a échoué : %s", q, exc)
+        logger.warning("yf.Search('%s') a échoué : %s", q, exc)
         return {"results": []}
 
     if not raw:
@@ -356,7 +370,9 @@ async def search(q: str = Query(..., min_length=1, max_length=100, description="
     summary="Historique des analyses effectuées",
     description="Retourne la liste des analyses effectuées, de la plus récente à la plus ancienne.",
 )
-async def get_analyses():
+async def get_analyses(
+    _user: Annotated[User, Depends(get_current_user)],
+):
     entries = storage.get_all()
     return {"analyses": entries, "total": len(entries)}
 

@@ -1,4 +1,11 @@
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+_INSECURE_DEFAULTS = {
+    "postgres_password": "changeme",
+    "secret_key": "change_me_with_a_random_32_byte_hex_string",
+}
 
 
 class Settings(BaseSettings):
@@ -25,8 +32,17 @@ class Settings(BaseSettings):
     log_level: str = "info"
     secret_key: str = "change_me_with_a_random_32_byte_hex_string"
 
-    # CORS — origines Next.js autorisées
+    # CORS — origines Next.js autorisées (string CSV ou list autorisé via .env)
     cors_origins: list[str] = ["http://localhost:3000"]
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def _parse_cors_origins(cls, value: object) -> list[str]:
+        if isinstance(value, str):
+            return [origin.strip() for origin in value.split(",") if origin.strip()]
+        if isinstance(value, list):
+            return value
+        raise ValueError("cors_origins doit être une liste ou une chaîne CSV")
 
     # Session cookie
     session_cookie_name: str = "cc_session"
@@ -63,6 +79,40 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.app_env == "production"
+
+    @model_validator(mode="after")
+    def _validate_production_secrets(self) -> "Settings":
+        """En production : refuse les secrets par défaut, les CORS permissifs et les configs vides.
+
+        Raison : un déploiement avec `change_me_*` ou `cron_secret=""` est une faille
+        critique. Cette validation au boot fait crasher l'app plutôt que démarrer
+        en silence avec une config dangereuse.
+        """
+        if not self.is_production:
+            return self
+
+        problems: list[str] = []
+        if self.secret_key == _INSECURE_DEFAULTS["secret_key"]:
+            problems.append("secret_key utilise la valeur par défaut")
+        if self.postgres_password == _INSECURE_DEFAULTS["postgres_password"]:
+            problems.append("postgres_password utilise la valeur par défaut")
+        if not self.cron_secret:
+            problems.append("cron_secret est vide")
+        if not self.resend_api_key:
+            problems.append("resend_api_key est vide")
+        if not self.cors_origins:
+            problems.append("cors_origins est vide")
+        if "*" in self.cors_origins:
+            problems.append("cors_origins contient '*' (interdit en prod avec credentials=True)")
+        non_https = [o for o in self.cors_origins if not o.startswith("https://")]
+        if non_https:
+            problems.append(f"cors_origins contient des origines non-HTTPS: {non_https}")
+
+        if problems:
+            raise RuntimeError(
+                "Configuration de production invalide:\n  - " + "\n  - ".join(problems)
+            )
+        return self
 
 
 settings = Settings()

@@ -18,6 +18,7 @@ Exemple d'usage:
 """
 
 import json
+import logging
 import os
 import time
 from datetime import datetime, timezone
@@ -25,6 +26,8 @@ from pathlib import Path
 from typing import Any, Optional
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Config
@@ -72,7 +75,7 @@ def _load_cache(cache_key: str) -> Optional[Any]:
                 _MEMORY_CACHE[cache_key] = raw
                 return raw["data"]
         except Exception:
-            pass
+            logger.warning("Cache FMP corrompu pour %s : %s", cache_key, path, exc_info=True)
     return None
 
 
@@ -84,7 +87,7 @@ def _save_cache(cache_key: str, data: Any) -> None:
             json.dumps(entry, ensure_ascii=False, default=str), encoding="utf-8"
         )
     except Exception:
-        pass
+        logger.warning("Echec ecriture cache FMP pour %s", cache_key, exc_info=True)
 
 
 # ---------------------------------------------------------------------------

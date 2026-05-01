@@ -1,8 +1,11 @@
 """Routes d'authentification — /auth/*"""
+import logging
 from datetime import datetime, timezone
 from typing import Annotated
 
 import uuid
+
+logger = logging.getLogger(__name__)
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -319,7 +322,7 @@ async def verify_email(
         try:
             await send_welcome_email(user.email, first_name)
         except Exception:
-            pass
+            logger.exception("Echec envoi welcome email a %s", user.email)
 
     return MessageOut(message="Email vérifié")
 

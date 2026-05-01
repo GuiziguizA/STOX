@@ -3,9 +3,12 @@ Persistance légère des analyses en JSON.
 Stocke l'historique des analyses effectuées pour le tableau récapitulatif.
 """
 import json
+import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 _STORAGE_FILE = os.path.join(os.path.dirname(__file__), "analyses_history.json")
 _MAX_ENTRIES = 200  # limite pour éviter un fichier trop grand
@@ -19,6 +22,7 @@ def _load() -> list[dict]:
             data = json.load(f)
             return data if isinstance(data, list) else []
     except Exception:
+        logger.exception("Lecture cache analyses corrompue : %s", _STORAGE_FILE)
         return []
 
 
@@ -62,8 +66,8 @@ def save_analysis(result: Any) -> None:
         "prev_score": prev_score,
         "trend": trend,
         "zone": data.get("valorisation", {}).get("zone_result", {}).get("zone", ""),
-        "date": data.get("last_updated", datetime.utcnow().isoformat()),
-        "saved_at": datetime.utcnow().isoformat(),
+        "date": data.get("last_updated", datetime.now(timezone.utc).isoformat()),
+        "saved_at": datetime.now(timezone.utc).isoformat(),
     }
 
     # Dé-dupliquer: on ajoute quand même (historique, pas upsert)
