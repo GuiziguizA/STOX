@@ -25,7 +25,7 @@ from app.core.security import (
 )
 from app.models.auth import AuthSession, EmailVerificationToken, PasswordResetToken
 from app.models.audit import AuditEventType
-from app.models.user import Profile, User, UserStatus
+from app.models.user import Permission, Profile, Role, RolePermission, User, UserRole, UserStatus
 from app.schemas.auth import (
     ForgotPasswordIn,
     LoginIn,
@@ -74,9 +74,9 @@ def _load_user_full(user_id):
         .options(
             selectinload(User.profile),
             selectinload(User.user_roles)
-            .selectinload("role")
-            .selectinload("role_permissions")
-            .selectinload("permission"),
+            .selectinload(UserRole.role)
+            .selectinload(Role.role_permissions)
+            .selectinload(RolePermission.permission),
         )
     )
 

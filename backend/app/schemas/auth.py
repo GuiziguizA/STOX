@@ -1,5 +1,7 @@
 import uuid
 from datetime import datetime
+from ipaddress import IPv4Address, IPv6Address
+from typing import Any
 
 from pydantic import BaseModel, EmailStr, field_validator
 
@@ -15,6 +17,17 @@ class SessionOut(BaseModel):
     ip_address: str | None = None
     user_agent: str | None = None
     created_at: datetime
+
+    @field_validator("ip_address", mode="before")
+    @classmethod
+    def _coerce_ip(cls, value: Any) -> str | None:
+        # PostgreSQL INET column → asyncpg renvoie un IPv4Address/IPv6Address ;
+        # Pydantic v2 strict ne coerce plus implicitement, on convertit en str.
+        if value is None:
+            return None
+        if isinstance(value, (IPv4Address, IPv6Address)):
+            return str(value)
+        return value
 
 
 class RegisterIn(BaseModel):

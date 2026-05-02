@@ -6,7 +6,19 @@ App mobile d'analyse boursiere pour debutants francais.
 
 - **Backend** : FastAPI (Python 3.12), SQLAlchemy async, Alembic, asyncpg, Redis, yfinance, pytest
 - **Frontend** : Next.js 16 (App Router), React 19, TypeScript, Tailwind 4, react-hook-form, zod, recharts
-- **Infra** : docker-compose (Postgres 16, Redis 7, FastAPI, Next.js)
+- **Infra** : docker-compose (Postgres 16, Redis 7, FastAPI, Next.js, **nginx reverse proxy**)
+
+## Reseau Docker — single origin via nginx
+
+Tous les services tournent sur le reseau `app-net`. Le **navigateur ne parle qu'a nginx** (`http://localhost`, port 80) qui route en interne vers `api:8000` ou `web:3000` via DNS Docker.
+
+- **Tester via `http://localhost`** (port 80, pas `:8000` ni `:3000`). Les ports 8000/3000 restent exposes en dev pour debug direct mais ne doivent PAS etre la cible des appels frontend.
+- Le frontend appelle des **URLs relatives** (ex: `/api/v1/auth/me`) — `NEXT_PUBLIC_API_URL` est volontairement **vide** dans `.env`. Voir `frontend/lib/config.ts`.
+- Le code Next.js cote serveur (`proxy.ts` middleware) utilise `INTERNAL_API_URL=http://api:8000` (DNS Docker, jamais inline dans le bundle browser).
+- Config nginx : `nginx/nginx.dev.conf` (dev) et `nginx/nginx.prod.conf` (prod, TLS + HSTS).
+- Prod : `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build` — coupe les ports host pour api/web/db, garde uniquement 80/443 sur nginx.
+
+Le backend FastAPI utilise `ProxyHeadersMiddleware` pour que `request.client.host` reflete la vraie IP client (essentiel pour le rate-limit, qui keye par IP).
 
 ## Conventions
 

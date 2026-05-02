@@ -20,13 +20,16 @@ logging.basicConfig(
 )
 
 app = FastAPI(
-    title="AnalysePro API",
+    title="STOX API",
     version="4.0.0",
     docs_url="/docs" if not settings.is_production else None,
     redoc_url="/redoc" if not settings.is_production else None,
 )
 
 # ── Middlewares ───────────────────────────────────────────────────────────────
+# Starlette execute les middlewares dans l'ordre INVERSE d'enregistrement
+# (LIFO). Le dernier add_middleware = le plus exterieur = le premier
+# a s'executer sur la requete entrante.
 app.add_middleware(AccessLogMiddleware)
 app.add_middleware(RequestIDMiddleware)
 app.add_middleware(
@@ -37,6 +40,10 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["x-request-id"],
 )
+# Note: la reecriture de request.client.host depuis X-Forwarded-For est faite
+# en amont par uvicorn via les flags --proxy-headers --forwarded-allow-ips=*
+# (voir backend/Dockerfile). Necessaire pour que le rate-limit (key = client IP)
+# voie la vraie IP client envoyee par nginx, et non l'IP du container nginx.
 
 # ── Exception handlers ────────────────────────────────────────────────────────
 

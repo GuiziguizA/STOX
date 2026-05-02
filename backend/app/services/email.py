@@ -62,7 +62,7 @@ _BASE = """\
 <div class="card">
 {body}
 <div class="footer">
-  <p>© AnalysePro — <a href="{frontend_url}/legal/privacy">Politique de confidentialité</a> · <a href="{frontend_url}/legal/terms">CGU</a></p>
+  <p>© STOX — <a href="{frontend_url}/legal/privacy">Politique de confidentialité</a> · <a href="{frontend_url}/legal/terms">CGU</a></p>
   <p>Si vous n'avez pas effectué cette action, ignorez cet email ou contactez <a href="mailto:{reply_to}">{reply_to}</a>.</p>
 </div>
 </div>
@@ -82,7 +82,7 @@ def _render(body: str) -> str:
 def _tpl_verify(link: str) -> tuple[str, str]:
     html = _render(f"""
 <h1>Vérifiez votre adresse email</h1>
-<p>Merci de vous être inscrit sur AnalysePro. Cliquez sur le bouton ci-dessous pour activer votre compte.</p>
+<p>Merci de vous être inscrit sur STOX. Cliquez sur le bouton ci-dessous pour activer votre compte.</p>
 <a class="btn" href="{link}">Vérifier mon email</a>
 <p>Ce lien expire dans <strong>24 heures</strong>.</p>
 <p>Si le bouton ne fonctionne pas, copiez-collez ce lien dans votre navigateur :<br>
@@ -115,9 +115,9 @@ def _tpl_reset(link: str) -> tuple[str, str]:
 def _tpl_welcome(first_name: str | None) -> tuple[str, str]:
     name = first_name or "vous"
     html = _render(f"""
-<h1>Bienvenue sur AnalysePro 🎉</h1>
+<h1>Bienvenue sur STOX 🎉</h1>
 <p>Bonjour {name},</p>
-<p>Votre email est confirmé et votre compte est actif. Vous pouvez désormais accéder à toutes les fonctionnalités d'AnalysePro.</p>
+<p>Votre email est confirmé et votre compte est actif. Vous pouvez désormais accéder à toutes les fonctionnalités d'STOX.</p>
 <a class="btn" href="{settings.frontend_url}/dashboard">Accéder à mon espace</a>
 <p><strong>Pour commencer :</strong></p>
 <ul>
@@ -127,7 +127,7 @@ def _tpl_welcome(first_name: str | None) -> tuple[str, str]:
 </ul>
 """)
     text = (
-        f"Bienvenue sur AnalysePro !\n\n"
+        f"Bienvenue sur STOX !\n\n"
         f"Bonjour {name}, votre compte est actif.\n"
         f"Connectez-vous : {settings.frontend_url}/dashboard"
     )
@@ -138,13 +138,13 @@ def _tpl_suspend(reason: str | None) -> tuple[str, str]:
     reason_line = f"<p><strong>Raison :</strong> {reason}</p>" if reason else ""
     html = _render(f"""
 <h1>Votre compte a été suspendu</h1>
-<div class="warning">Votre accès à AnalysePro a été temporairement suspendu.</div>
+<div class="warning">Votre accès à STOX a été temporairement suspendu.</div>
 {reason_line}
 <p>Pour toute question ou contestation, contactez notre équipe support.</p>
 <a class="btn" href="mailto:{settings.email_reply_to}">Contacter le support</a>
 """)
     text = (
-        f"Votre compte AnalysePro a été suspendu.\n"
+        f"Votre compte STOX a été suspendu.\n"
         + (f"Raison : {reason}\n" if reason else "")
         + f"Contactez le support : {settings.email_reply_to}"
     )
@@ -161,7 +161,7 @@ def _tpl_delete(days: int = 30) -> tuple[str, str]:
 <a class="btn" href="mailto:{settings.email_reply_to}">Contacter le support</a>
 """)
     text = (
-        f"Suppression de compte AnalysePro confirmée.\n\n"
+        f"Suppression de compte STOX confirmée.\n\n"
         f"Vos données seront supprimées définitivement dans {days} jours.\n"
         f"Les journaux d'audit sont conservés 12 mois (obligations légales).\n"
         f"Pour annuler : {settings.email_reply_to}"
@@ -182,7 +182,7 @@ def _tpl_security_alert(ip: str | None, user_agent: str | None) -> tuple[str, st
 <a class="btn" href="{settings.frontend_url}/settings/security">Gérer mes sessions</a>
 """)
     text = (
-        f"Nouvelle connexion AnalysePro détectée.\n"
+        f"Nouvelle connexion STOX détectée.\n"
         + (f"IP : {ip}\n" if ip else "")
         + f"Si ce n'était pas vous : {settings.frontend_url}/settings/security"
     )
@@ -194,41 +194,41 @@ def _tpl_security_alert(ip: str | None, user_agent: str | None) -> tuple[str, st
 async def send_verification_email(email: str, token_hex: str) -> None:
     link = f"{settings.frontend_url}/verify-email?token={token_hex}"
     html, text = _tpl_verify(link)
-    await _send("Vérifiez votre adresse email — AnalysePro", html, text, email)
+    await _send("Vérifiez votre adresse email — STOX", html, text, email)
 
 
 async def send_password_reset_email(email: str, token_hex: str) -> None:
     link = f"{settings.frontend_url}/reset-password?token={token_hex}"
     html, text = _tpl_reset(link)
-    await _send("Réinitialisation de mot de passe — AnalysePro", html, text, email)
+    await _send("Réinitialisation de mot de passe — STOX", html, text, email)
 
 
 async def send_welcome_email(email: str, first_name: str | None = None) -> None:
     html, text = _tpl_welcome(first_name)
-    await _send("Bienvenue sur AnalysePro !", html, text, email)
+    await _send("Bienvenue sur STOX !", html, text, email)
 
 
 async def send_invite_email(email: str, token_hex: str, invited_by: str | None = None) -> None:
     link = f"{settings.frontend_url}/verify-email?token={token_hex}"
     body = f"""
-<h1>Vous avez été invité sur AnalysePro</h1>
+<h1>Vous avez été invité sur STOX</h1>
 {"<p>Invitation envoyée par <strong>" + invited_by + "</strong>.</p>" if invited_by else ""}
 <a class="btn" href="{link}">Accepter l'invitation</a>
 <p>Ce lien expire dans 7 jours.</p>
 """
     html = _render(body)
-    text = f"Invitation AnalysePro. Lien (7j) : {link}"
-    await _send("Vous avez été invité sur AnalysePro", html, text, email)
+    text = f"Invitation STOX. Lien (7j) : {link}"
+    await _send("Vous avez été invité sur STOX", html, text, email)
 
 
 async def send_suspension_email(email: str, reason: str | None = None) -> None:
     html, text = _tpl_suspend(reason)
-    await _send("Votre compte AnalysePro a été suspendu", html, text, email)
+    await _send("Votre compte STOX a été suspendu", html, text, email)
 
 
 async def send_deletion_email(email: str) -> None:
     html, text = _tpl_delete()
-    await _send("Confirmation de suppression de compte — AnalysePro", html, text, email)
+    await _send("Confirmation de suppression de compte — STOX", html, text, email)
 
 
 async def send_security_alert_email(
@@ -237,4 +237,4 @@ async def send_security_alert_email(
     user_agent: str | None = None,
 ) -> None:
     html, text = _tpl_security_alert(ip, user_agent)
-    await _send("Nouvelle connexion détectée — AnalysePro", html, text, email)
+    await _send("Nouvelle connexion détectée — STOX", html, text, email)

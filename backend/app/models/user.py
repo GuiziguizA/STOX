@@ -47,7 +47,10 @@ class User(Base):
         "Profile", back_populates="user", uselist=False, lazy="selectin"
     )
     user_roles: Mapped[list["UserRole"]] = relationship(
-        "UserRole", back_populates="user", lazy="selectin"
+        "UserRole",
+        back_populates="user",
+        lazy="selectin",
+        foreign_keys="UserRole.user_id",
     )
     sessions: Mapped[list["AuthSession"]] = relationship(  # type: ignore[name-defined]  # noqa: F821
         "AuthSession", back_populates="user", lazy="noload"

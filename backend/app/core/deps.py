@@ -12,7 +12,7 @@ from app.core.config import settings
 from app.core.db import get_db
 from app.core.security import cookie_to_token, hash_token
 from app.models.auth import AuthSession
-from app.models.user import User, UserStatus
+from app.models.user import Role, RolePermission, User, UserRole, UserStatus
 
 
 def _now() -> datetime:
@@ -80,9 +80,9 @@ async def get_current_user(
         .options(
             selectinload(User.profile),
             selectinload(User.user_roles)
-            .selectinload("role")
-            .selectinload("role_permissions")
-            .selectinload("permission"),
+            .selectinload(UserRole.role)
+            .selectinload(Role.role_permissions)
+            .selectinload(RolePermission.permission),
         )
     )
     user = result.scalar_one_or_none()

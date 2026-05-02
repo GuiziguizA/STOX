@@ -47,7 +47,15 @@ class AuditLog(Base):
         nullable=True,
     )
     event_type: Mapped[AuditEventType] = mapped_column(
-        Enum(AuditEventType, name="audit_event_type", create_type=False),
+        Enum(
+            AuditEventType,
+            name="audit_event_type",
+            create_type=False,
+            # Force l'utilisation de .value (ex: "user.register") cote DB
+            # plutot que .name (ex: "user_register"). Sinon SQLAlchemy serialise
+            # le name Python qui ne matche pas l'enum PostgreSQL.
+            values_callable=lambda obj: [e.value for e in obj],
+        ),
         nullable=False,
     )
     payload_json: Mapped[dict] = mapped_column(

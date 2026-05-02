@@ -1,5 +1,7 @@
+from typing import Annotated
+
 from pydantic import field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 _INSECURE_DEFAULTS = {
@@ -32,8 +34,13 @@ class Settings(BaseSettings):
     log_level: str = "info"
     secret_key: str = "change_me_with_a_random_32_byte_hex_string"
 
-    # CORS — origines Next.js autorisées (string CSV ou list autorisé via .env)
-    cors_origins: list[str] = ["http://localhost:3000"]
+    # CORS — origines Next.js autorisees (string CSV ou list via .env).
+    # Avec nginx en reverse proxy single-origin, le browser appelle toujours
+    # http://localhost (port 80), donc une seule origine suffit en dev.
+    # NoDecode : empeche pydantic-settings 2.x de tenter un json.loads sur la
+    # valeur env brute (ex: "http://localhost"), ce qui laisse le validator
+    # _parse_cors_origins ci-dessous gerer le format CSV.
+    cors_origins: Annotated[list[str], NoDecode] = ["http://localhost"]
 
     @field_validator("cors_origins", mode="before")
     @classmethod
@@ -58,8 +65,9 @@ class Settings(BaseSettings):
     email_from: str = "noreply@exemple.fr"
     email_reply_to: str = "support@exemple.fr"
 
-    # Frontend
-    frontend_url: str = "http://localhost:3000"
+    # Frontend — URL publique (utilisee dans les liens d'email).
+    # Single-origin via nginx -> http://localhost (port 80) en dev.
+    frontend_url: str = "http://localhost"
 
     # Cron jobs purge
     cron_secret: str = ""

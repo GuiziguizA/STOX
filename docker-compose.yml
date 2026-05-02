@@ -44,7 +44,9 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-projet_action}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD requis dans .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+    - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -73,24 +75,33 @@ services:
       retries: 5
       start_period: 5s
 
-  # ── Frontend Next.js (stub) ─────────────────────────────────────────────────
+  # ── Frontend Next.js ─────────────────────────────────────────────────────────
   web:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      target: dev
     container_name: projet_action_web
     restart: unless-stopped
     ports:
       - "${WEB_PORT:-3000}:3000"
     env_file:
       - .env
+    environment:
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-}
+      - INTERNAL_API_URL=${INTERNAL_API_URL:-http://api:8000}
+      - WATCHPACK_POLLING=true
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
     networks:
       - app-net
     depends_on:
-      api:
-        condition: service_healthy
+      - db
+      - cache
 
-  # ── Adminer (inspecteur DB) — profil tools ──────────────────────────────────
+  # ── Adminer (inspecteur DB) ───────────────────────────────────────────────────
   adminer:
     image: adminer:latest
     container_name: projet_action_adminer
@@ -101,5 +112,26 @@ services:
       - app-net
     depends_on:
       - db
-    profiles:
-      - tools
+
+  # ── Reverse proxy nginx (single-origin pour browser) ────────────────────────
+  proxy:
+    image: nginx:1.27-alpine
+    container_name: projet_action_proxy
+    restart: unless-stopped
+    ports:
+      - "${PROXY_HTTP_PORT:-80}:80"
+    volumes:
+      - ./nginx/nginx.dev.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - app-net
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

@@ -1,0 +1,42 @@
+# Override de production. A utiliser ainsi :
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Effet :
+#   - Build les images en target=prod (immutable, sans hot-reload).
+#   - Coupe les bind-mounts de code (volumes: []).
+#   - Coupe les port mappings host pour api/web/db/cache (seul nginx ecoute le monde).
+#   - Active TLS + nginx.prod.conf sur le service proxy.
+#   - Adminer reste disabled par defaut (profile "debug").
+services:
+  api:
+    build:
+      target: prod
+    volumes: []
+    ports: []
+
+  web:
+    build:
+      target: prod
+    volumes: []
+    ports: []
+    environment:
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-}
+      - INTERNAL_API_URL=http://api:8000
+      - NODE_ENV=production
+
+  proxy:
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+
+  adminer:
+    profiles: ["debug"]
+
+  db:
+    ports: []
+
+  cache:
+    ports: []
