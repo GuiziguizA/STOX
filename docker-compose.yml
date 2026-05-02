@@ -8,6 +8,24 @@ volumes:
 
 services:
 
+  # ── Migrations Alembic (one-shot, sort en 0 quand termine) ──────────────────
+  migrate:
+    build:
+      context: ./backend
+      target: dev
+    container_name: projet_action_migrate
+    command: ["alembic", "upgrade", "head"]
+    env_file:
+      - .env
+    volumes:
+      - ./backend:/app
+    networks:
+      - app-net
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
   # ── API FastAPI ─────────────────────────────────────────────────────────────
   api:
     build:
@@ -29,8 +47,10 @@ services:
         condition: service_healthy
       cache:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8000/health || exit 1"]
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)\""]
       interval: 30s
       timeout: 10s
       retries: 3

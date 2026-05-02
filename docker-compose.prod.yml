@@ -8,6 +8,11 @@
 #   - Active TLS + nginx.prod.conf sur le service proxy.
 #   - Adminer reste disabled par defaut (profile "debug").
 services:
+  migrate:
+    build:
+      target: prod
+    volumes: []
+
   api:
     build:
       target: prod
