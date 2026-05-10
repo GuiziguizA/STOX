@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  validate-compose:
+    name: Validate docker-compose
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: docker compose config (dev)
+        run: docker compose -f docker-compose.yml config >/dev/null
+        env:
+          POSTGRES_DB: ci
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          SECRET_KEY: ci_secret_ci_secret_ci_secret_ci_secret_ci
+          CRON_SECRET: ci_cron_secret_ci_cron_secret_ci_cron_secret
+          RESEND_API_KEY: re_ci_dummy
+          CORS_ORIGINS: http://localhost
+          APP_ENV: development
+
+      - name: docker compose config (prod overlay)
+        run: docker compose -f docker-compose.yml -f docker-compose.prod.yml config >/dev/null
+        env:
+          POSTGRES_DB: ci
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          SECRET_KEY: ci_secret_ci_secret_ci_secret_ci_secret_ci
+          CRON_SECRET: ci_cron_secret_ci_cron_secret_ci_cron_secret
+          RESEND_API_KEY: re_ci_dummy
+          CORS_ORIGINS: https://example.com
+          APP_ENV: production
+
+      - name: Detect hardcoded secrets in compose files
+        run: |
+          if grep -nE '(password|secret|api[_-]?key)\s*[:=]\s*["'\'']?[A-Za-z0-9_-]{16,}' docker-compose.yml docker-compose.prod.yml; then
+            echo "::error::Hardcoded secret detected in compose files"
+            exit 1
+          fi
+
+  submodule-sanity:
+    name: Submodule pointers exist on remote
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Verify each submodule SHA exists upstream
+        run: |
+          set -euo pipefail
+          git submodule foreach --quiet '
+            sha=$(git rev-parse HEAD)
+            remote=$(git config --get remote.origin.url)
+            echo "Checking $name @ $sha against $remote"
+            if ! git ls-remote "$remote" | awk "{print \$1}" | grep -q "^$sha$"; then
+              if ! git fetch "$remote" "$sha" 2>/dev/null; then
+                echo "::error::Submodule $name SHA $sha not found on $remote"
+                exit 1
+              fi
+            fi
+          '
