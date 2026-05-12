@@ -164,15 +164,15 @@ services:
         condition: service_healthy
 
   # ── Reverse proxy nginx (single-origin pour browser) ────────────────────────
+  # Image custom : la conf nginx est embedded dans l'image au build (cf
+  # nginx/Dockerfile) pour eviter les pieges de bind mount avec Coolify.
   # Coolify expose le port 80 du proxy via Traefik (TLS Let's Encrypt auto).
-  # SERVICE_FQDN_PROXY_80 declare l'enregistrement Traefik.
   proxy:
-    image: nginx:1.27-alpine
+    build:
+      context: ./nginx
     restart: unless-stopped
     expose:
       - "80"
-    volumes:
-      - ./nginx/nginx.dev.conf:/etc/nginx/nginx.conf:ro
     networks:
       - app-net
     environment:
