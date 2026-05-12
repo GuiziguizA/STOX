@@ -1,0 +1,188 @@
+# ── Compose dedie a Coolify ─────────────────────────────────────────────────
+# Differences vs docker-compose.yml (dev) :
+#   - target: prod (pas dev, pas de hot-reload, code copie dans l'image)
+#   - pas de container_name (Coolify les nomme avec un suffixe unique)
+#   - pas de ports: host (Traefik route via SERVICE_FQDN_*)
+#   - pas de bind mounts du code (immutable, vient du build)
+#   - pas de mailpit / adminer (envoi via Resend en prod)
+#   - Coolify magic : SERVICE_FQDN_PROXY_80 declare un FQDN+routing Traefik
+#
+# A configurer dans Coolify UI -> Environment Variables :
+#   APP_ENV=production
+#   POSTGRES_DB=stox
+#   POSTGRES_USER=stox
+#   POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+#   SECRET_KEY=<python -c "import secrets; print(secrets.token_hex(32))">
+#   CRON_SECRET=<python -c "import secrets; print(secrets.token_hex(32))">
+#   RESEND_API_KEY=re_xxx
+#   EMAIL_FROM=STOX <noreply@stox.tondomaine.fr>
+#   EMAIL_REPLY_TO=support@stox.tondomaine.fr
+#   CORS_ORIGINS=https://<FQDN_GENERE_PAR_COOLIFY>
+#   FRONTEND_URL=https://<FQDN_GENERE_PAR_COOLIFY>
+#   FMP_API_KEY=<optionnel>
+#   SERVICE_FQDN_PROXY_80=/          # Coolify genere le FQDN
+#
+# Si pas de domaine TLS encore : laisser APP_ENV=development pour eviter le
+# validator strict qui exige CORS_ORIGINS HTTPS (cf. config.py:_validate_*).
+
+networks:
+  app-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+
+services:
+
+  # ── Migrations Alembic (one-shot, sort en 0 quand termine) ──────────────────
+  migrate:
+    build:
+      context: ./backend
+      target: prod
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      REDIS_URL: redis://cache:6379/0
+      SECRET_KEY: ${SECRET_KEY}
+      CRON_SECRET: ${CRON_SECRET}
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      EMAIL_FROM: ${EMAIL_FROM}
+      EMAIL_REPLY_TO: ${EMAIL_REPLY_TO}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      FRONTEND_URL: ${FRONTEND_URL}
+    networks:
+      - app-net
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  # ── API FastAPI ─────────────────────────────────────────────────────────────
+  api:
+    build:
+      context: ./backend
+      target: prod
+    restart: unless-stopped
+    expose:
+      - "8000"
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      REDIS_URL: redis://cache:6379/0
+      SECRET_KEY: ${SECRET_KEY}
+      CRON_SECRET: ${CRON_SECRET}
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      EMAIL_FROM: ${EMAIL_FROM}
+      EMAIL_REPLY_TO: ${EMAIL_REPLY_TO}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      FRONTEND_URL: ${FRONTEND_URL}
+      FMP_API_KEY: ${FMP_API_KEY:-}
+    networks:
+      - app-net
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ── PostgreSQL 16 ───────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  # ── Redis 7 ────────────────────────────────────────────────────────────────
+  cache:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --save 60 1
+    volumes:
+      - redis_data:/data
+    networks:
+      - app-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  # ── Frontend Next.js (build prod, npm start) ────────────────────────────────
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: prod
+    restart: unless-stopped
+    expose:
+      - "3000"
+    environment:
+      NEXT_PUBLIC_API_URL: ""
+      INTERNAL_API_URL: http://api:8000
+      NODE_ENV: production
+    networks:
+      - app-net
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+
+  # ── Reverse proxy nginx (single-origin pour browser) ────────────────────────
+  # Coolify expose le port 80 du proxy via Traefik (TLS Let's Encrypt auto).
+  # SERVICE_FQDN_PROXY_80 declare l'enregistrement Traefik.
+  proxy:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    expose:
+      - "80"
+    volumes:
+      - ./nginx/nginx.dev.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - app-net
+    environment:
+      SERVICE_FQDN_PROXY_80: ${SERVICE_FQDN_PROXY_80:-/}
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
