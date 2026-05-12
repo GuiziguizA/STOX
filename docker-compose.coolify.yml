@@ -36,11 +36,34 @@ volumes:
 services:
 
   # ── Migrations Alembic (one-shot, sort en 0 quand termine) ──────────────────
+  # DEBUG MODE : dump env + run alembic + reste vivant 10 min apres echec
+  # pour permettre `docker logs` et `docker exec` avant que Coolify nettoie.
+  # Revenir a `command: ["alembic", "upgrade", "head"]` une fois debug.
   migrate:
     build:
       context: ./backend
       target: prod
-    command: ["alembic", "upgrade", "head"]
+    command:
+      - bash
+      - -c
+      - |
+        set +e
+        echo "===== ENV VARS (sensitive masked) ====="
+        env | grep -E "^(APP_ENV|POSTGRES_|REDIS_|SECRET_KEY|CRON_SECRET|RESEND_|EMAIL_|CORS_|FRONTEND_|FMP_|SMTP_)" | sed -E 's/(PASSWORD|KEY|SECRET)=.*/\1=***MASKED***/g'
+        echo
+        echo "===== PYTHON CONFIG CHECK ====="
+        python -c "from app.core.config import settings; print('OK -- is_production:', settings.is_production, 'db:', settings.postgres_host, settings.postgres_port, settings.postgres_db)" 2>&1
+        echo
+        echo "===== ALEMBIC UPGRADE HEAD ====="
+        alembic upgrade head 2>&1
+        rc=$?
+        echo
+        echo "===== EXIT CODE: $rc ====="
+        if [ "$rc" != "0" ]; then
+          echo "Sleeping 600s for inspection..."
+          sleep 600
+        fi
+        exit $rc
     environment:
       APP_ENV: ${APP_ENV:-production}
       POSTGRES_HOST: db
