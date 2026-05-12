@@ -138,19 +138,21 @@ services:
       retries: 5
       start_period: 5s
 
-  # ── Frontend Next.js (build prod, npm start) ────────────────────────────────
+  # ── Frontend Next.js ────────────────────────────────────────────────────────
+  # TODO: passer en target: prod une fois que frontend/package.json est bumpe
+  # vers next@^15 ou ^16. Aujourd'hui next@^9.3.3 casse `next build` (App Router
+  # non parse). En attendant on utilise target: dev (next dev sur code copie).
   web:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      target: prod
+      target: dev
     restart: unless-stopped
     expose:
       - "3000"
     environment:
       NEXT_PUBLIC_API_URL: ""
       INTERNAL_API_URL: http://api:8000
-      NODE_ENV: production
     networks:
       - app-net
     depends_on:
