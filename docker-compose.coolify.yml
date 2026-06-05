@@ -146,7 +146,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      target: dev
+      target: prod
     restart: unless-stopped
     expose:
       - "3000"
