@@ -4,3 +4,7 @@
 [submodule "frontend"]
 	path = frontend
 	url = ../projet-action-frontend.git
+[submodule "mobile"]
+	path = mobile
+	url = ../stox-mobile.git
+	branch = v3
