@@ -155,6 +155,16 @@ services:
       INTERNAL_API_URL: http://api:8000
     networks:
       - app-net
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/').then(r => process.exit(r.status < 500 ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     depends_on:
       db:
         condition: service_healthy
@@ -177,6 +187,10 @@ services:
       - app-net
     environment:
       SERVICE_FQDN_PROXY_80: ${SERVICE_FQDN_PROXY_80:-/}
+    labels:
+      # Le proxy est sur deux reseaux (celui de Coolify/Traefik et app-net) : sans
+      # ce label, Traefik peut choisir l'IP d'app-net, qu'il ne joint pas (504).
+      - traefik.docker.network=iyyokm2auo1sjvmv9vk1nt37
     depends_on:
       api:
         condition: service_healthy
