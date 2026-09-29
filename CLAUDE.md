@@ -56,8 +56,8 @@ Le vault `C:\dev\cerveau` est la memoire externe (cf `~/.claude/CLAUDE.md` pour 
 - Ne jamais committer `.claude/worktrees/` (ignoré par `.gitignore`). Vérifier `git ls-tree -r HEAD | grep 160000` : seuls `backend`, `frontend` et `mobile` doivent apparaître.
 - Le dépôt STOX est **public**, mais ses trois submodules (`projet-action-backend`, `projet-action-frontend`, `stox-mobile`, tous chez `GuiziguizA`) sont **privés** : le `GITHUB_TOKEN` de la CI ne peut pas les lire.
 - Les checkouts de la CI utilisent le `GITHUB_TOKEN` par défaut avec `submodules: false` : les submodules ne sont jamais téléchargés, avec ou sans secret.
-- Seul le job `submodule-sanity` utilise le secret `SUBMODULES_TOKEN` (PAT fine-grained, Contents: Read-only, limité à ces trois dépôts) pour faire un `git fetch` du SHA pointé par chaque submodule. Sans ce secret, le job passe avec un avertissement (`::warning`), sans faire échouer la CI.
-- **Le PAT expire** : penser à le renouveler (même nom de secret), sinon seule la vérification des pointeurs est ignorée.
+- Le secret `SUBMODULES_TOKEN` est **facultatif et volontairement absent** (décision du 2026-09-29). Seul le job `submodule-sanity` s'en servirait, pour vérifier que le SHA pointé par chaque submodule existe sur son dépôt. Sans lui, ce job est sauté avec l'avertissement « SUBMODULES_TOKEN absent » : c'est normal, ce n'est pas un problème et il ne faut pas proposer de créer le secret.
+- Si on le crée un jour : PAT fine-grained, Contents: Read-only, limité aux trois dépôts de submodules ; penser à son expiration.
 - Avant de conclure qu'une PR casse la CI, vérifier si `master` échoue déjà : `gh run list --branch master`.
 - Tout nouveau workflow qui fait un checkout doit gérer les submodules privés : garder `submodules: false`, ne jamais utiliser `submodules: true` sans accès aux dépôts, sinon il échoue au checkout.
 
