@@ -9,19 +9,30 @@ on:
 permissions:
   contents: read
 
+# Les dépôts des submodules (backend, frontend, mobile) sont privés alors que
+# STOX est public : le GITHUB_TOKEN ne peut pas les lire. Aucun job ne clone
+# donc les submodules. La vérification des pointeurs utilise le secret
+# optionnel SUBMODULES_TOKEN (PAT fine-grained, Contents: read sur les 3 dépôts).
+
 jobs:
   validate-compose:
     name: Validate docker-compose
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout (with submodules)
+      - name: Checkout (sans submodules)
         uses: actions/checkout@v4
         with:
-          submodules: recursive
-          fetch-depth: 0
+          submodules: false
+          token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
+
+      # `docker compose config` n'a pas besoin du contenu des build contexts
+      # (./backend, ./frontend) mais exige les env_file : on crée un .env
+      # factice à partir du modèle versionné.
+      - name: Prépare un .env factice
+        run: cp .env.example .env
 
       - name: docker compose config (dev)
-        run: docker compose -f docker-compose.yml config >/dev/null
+        run: docker compose -f docker-compose.yml config -q
         env:
           POSTGRES_DB: ci
           POSTGRES_USER: ci
@@ -33,7 +44,7 @@ jobs:
           APP_ENV: development
 
       - name: docker compose config (prod overlay)
-        run: docker compose -f docker-compose.yml -f docker-compose.prod.yml config >/dev/null
+        run: docker compose -f docker-compose.yml -f docker-compose.prod.yml config -q
         env:
           POSTGRES_DB: ci
           POSTGRES_USER: ci
@@ -44,9 +55,23 @@ jobs:
           CORS_ORIGINS: https://example.com
           APP_ENV: production
 
+      - name: docker compose config (coolify)
+        run: docker compose -f docker-compose.coolify.yml config -q
+        env:
+          POSTGRES_DB: ci
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          SECRET_KEY: ci_secret_ci_secret_ci_secret_ci_secret_ci
+          CRON_SECRET: ci_cron_secret_ci_cron_secret_ci_cron_secret
+          RESEND_API_KEY: re_ci_dummy
+          CORS_ORIGINS: https://example.com
+          FRONTEND_URL: https://example.com
+          EMAIL_FROM: ci@example.com
+          EMAIL_REPLY_TO: ci@example.com
+
       - name: Detect hardcoded secrets in compose files
         run: |
-          if grep -nE '(password|secret|api[_-]?key)\s*[:=]\s*["'\'']?[A-Za-z0-9_-]{16,}' docker-compose.yml docker-compose.prod.yml; then
+          if grep -nE '(password|secret|api[_-]?key)\s*[:=]\s*["'\'']?[A-Za-z0-9_-]{16,}' docker-compose.yml docker-compose.prod.yml docker-compose.coolify.yml; then
             echo "::error::Hardcoded secret detected in compose files"
             exit 1
           fi
@@ -54,24 +79,47 @@ jobs:
   submodule-sanity:
     name: Submodule pointers exist on remote
     runs-on: ubuntu-latest
+    env:
+      SUBMODULES_TOKEN: ${{ secrets.SUBMODULES_TOKEN }}
     steps:
-      - name: Checkout
+      - name: Checkout (sans submodules)
         uses: actions/checkout@v4
         with:
-          submodules: recursive
-          fetch-depth: 0
+          submodules: false
+          token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
 
       - name: Verify each submodule SHA exists upstream
         run: |
           set -euo pipefail
-          git submodule foreach --quiet '
-            sha=$(git rev-parse HEAD)
-            remote=$(git config --get remote.origin.url)
-            echo "Checking $name @ $sha against $remote"
-            if ! git ls-remote "$remote" | awk "{print \$1}" | grep -q "^$sha$"; then
-              if ! git fetch "$remote" "$sha" 2>/dev/null; then
-                echo "::error::Submodule $name SHA $sha not found on $remote"
-                exit 1
-              fi
+          if [ -z "${SUBMODULES_TOKEN:-}" ]; then
+            echo "::warning title=Submodules::vérification ignorée : SUBMODULES_TOKEN absent (dépôts des submodules privés)"
+            exit 0
+          fi
+
+          owner="${GITHUB_REPOSITORY%/*}"
+          failed=0
+          while read -r key path; do
+            name="${key#submodule.}"; name="${name%.path}"
+            url=$(git config -f .gitmodules --get "submodule.$name.url")
+            # URL relative (../repo.git) -> dépôt voisin chez le même propriétaire
+            case "$url" in
+              ../*) repo="${url#../}" ;;
+              https://github.com/*) repo="${url#https://github.com/$owner/}" ;;
+              *) echo "::error::URL de submodule non gérée : $url"; failed=1; continue ;;
+            esac
+            repo="${repo%.git}"
+            sha=$(git ls-tree HEAD "$path" | awk '{print $3}')
+            echo "Checking $name ($path) @ $sha against $owner/$repo"
+
+            tmp=$(mktemp -d)
+            git -C "$tmp" init -q
+            if git -C "$tmp" fetch -q --depth=1 \
+                 "https://x-access-token:${SUBMODULES_TOKEN}@github.com/$owner/$repo.git" "$sha"; then
+              echo "  OK"
+            else
+              echo "::error::Submodule $name SHA $sha introuvable sur $owner/$repo"
+              failed=1
             fi
-          '
+            rm -rf "$tmp"
+          done < <(git config -f .gitmodules --get-regexp '^submodule\..*\.path$')
+          exit "$failed"
