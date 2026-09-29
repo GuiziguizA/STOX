@@ -49,6 +49,18 @@ Le vault `C:\dev\cerveau` est la memoire externe (cf `~/.claude/CLAUDE.md` pour 
 | Avant deploy | agent `security-reviewer` ou `/security-review` |
 | Fin session | `/save` (auto-rappele par hook Stop) — ecrit dans `cerveau/wiki/Daily/` |
 
+## CI GitHub Actions — submodules privés
+
+- **Historique** : la CI a été rouge sur `master` de mai à septembre 2026 (aucun run vert). Causes : un gitlink parasite `.claude/worktrees/…` (worktree Claude commité par erreur dans 8dd6d0c, absent de `.gitmodules`) qui cassait le checkout, puis le téléchargement des submodules privés sans accès. Corrigé par la PR #3.
+- Avant d'affirmer que « ça marchait avant », vérifier qu'il existe au moins un run vert : `gh run list --branch master --status success`.
+- Ne jamais committer `.claude/worktrees/` (ignoré par `.gitignore`). Vérifier `git ls-tree -r HEAD | grep 160000` : seuls `backend`, `frontend` et `mobile` doivent apparaître.
+- Le dépôt STOX est **public**, mais ses trois submodules (`projet-action-backend`, `projet-action-frontend`, `stox-mobile`, tous chez `GuiziguizA`) sont **privés** : le `GITHUB_TOKEN` de la CI ne peut pas les lire.
+- Les checkouts de la CI utilisent le `GITHUB_TOKEN` par défaut avec `submodules: false` : les submodules ne sont jamais téléchargés, avec ou sans secret.
+- Le secret `SUBMODULES_TOKEN` est **facultatif et volontairement absent** (décision du 2026-09-29). Seul le job `submodule-sanity` s'en servirait, pour vérifier que le SHA pointé par chaque submodule existe sur son dépôt. Sans lui, ce job est sauté avec l'avertissement « SUBMODULES_TOKEN absent » : c'est normal, ce n'est pas un problème et il ne faut pas proposer de créer le secret.
+- Si on le crée un jour : PAT fine-grained, Contents: Read-only, limité aux trois dépôts de submodules ; penser à son expiration.
+- Avant de conclure qu'une PR casse la CI, vérifier si `master` échoue déjà : `gh run list --branch master`.
+- Tout nouveau workflow qui fait un checkout doit gérer les submodules privés : garder `submodules: false`, ne jamais utiliser `submodules: true` sans accès aux dépôts, sinon il échoue au checkout.
+
 ## Regles absolues
 
 1. **Ne JAMAIS inventer** d'information absente du repo ou du vault — signaler quand la donnee manque
