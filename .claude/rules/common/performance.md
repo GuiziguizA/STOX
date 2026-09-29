@@ -1,21 +1,12 @@
 # Performance Optimization
 
-## Model Selection Strategy
+## Model Selection
 
-**Haiku 4.5** (90% of Sonnet capability, 3x cost savings):
-- Lightweight agents with frequent invocation
-- Pair programming and code generation
-- Worker agents in multi-agent systems
+Follow the global routing (`~/.claude/CLAUDE.md`), pass `model` on every Agent call:
 
-**Sonnet 4.6** (Best coding model):
-- Main development work
-- Orchestrating multi-agent workflows
-- Complex coding tasks
-
-**Opus 4.5** (Deepest reasoning):
-- Complex architectural decisions
-- Maximum reasoning requirements
-- Research and analysis tasks
+- **Fable 5.1** (`fable`): architecture, complex bugs, code review
+- **Opus 5.5** (`opus`): edits, tests, documentation, refactoring
+- **Sonnet 5.5** (`sonnet`): research and summaries
 
 ## Context Window Management
 
@@ -49,7 +40,6 @@ For complex tasks requiring deep reasoning:
 ## Build Troubleshooting
 
 If build fails:
-1. Use **build-error-resolver** agent
-2. Analyze error messages
-3. Fix incrementally
-4. Verify after each fix
+1. Analyze error messages
+2. Fix incrementally
+3. Verify after each fix

@@ -21,7 +21,7 @@ The Feature Implementation Workflow describes the development pipeline: research
    - Break down into phases
 
 2. **TDD Approach**
-   - Use **tdd-guide** agent
+   - Use the **tdd-workflow** skill
    - Write tests first (RED)
    - Implement to pass tests (GREEN)
    - Refactor (IMPROVE)

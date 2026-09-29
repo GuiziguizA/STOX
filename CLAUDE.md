@@ -27,27 +27,25 @@ Le backend FastAPI utilise `ProxyHeadersMiddleware` pour que `request.client.hos
 - **Migrations Alembic** : ne JAMAIS editer une migration deja appliquee — toujours en creer une nouvelle (`alembic revision --autogenerate -m "description"`)
 - **Tests** : pytest pour backend, Vitest/Playwright pour frontend (a confirmer selon ce qui est en place)
 
-## Memoire externe — vault Obsidian
+## Environnement
 
-Le vault `C:\dev\cerveau` est la memoire externe (cf `~/.claude/CLAUDE.md` pour les regles completes).
-
-- Notes brutes finance : `C:\dev\cerveau\raw\notes\finance\` (immutable, espace humain)
-- Decisions/recherches : `C:\dev\cerveau\wiki\Intelligence\`
-- Index a lire en premier : `C:\dev\cerveau\wiki\index.md`
+- Poste de travail **Linux**. Production sur le serveur **galisse.eu**, deployee par **Coolify** (proxy Traefik `coolify-proxy`), compose `docker-compose.coolify.yml`.
+- Exploitation du serveur : plugin **galisse-ops** (`ops-status`, `ops-deploy`, `ops-ship`, `ops-access`, `ops-security`, `ops-mobile`). S'en servir plutot que d'improviser des commandes Coolify/Docker.
+- Livraison par tag dans les submodules : `back-v*` (projet-action-backend) et `mobile-v*` (stox-mobile), executes par des runners auto-heberges `[self-hosted, galisse]`.
+- **Avant tout diagnostic** : `git fetch` puis comparer a `origin/master` (`git status -sb`, `git log HEAD..origin/master`). Les copies locales peuvent etre en retard, submodules compris (`git submodule status`).
 
 ## Workflow
 
 | Etape | Action |
 |---|---|
-| Debut session | `/prime` (auto via hook SessionStart) — charge le contexte vault |
-| Avant feature | `/query "<theme>"` (vault) + skill `search-first` (code) |
+| Avant feature | skill `search-first` (code existant, librairies) |
 | Plan feature | agent `planner` ou `/plan` |
-| Code backend | rules `python/*` actives en arriere-plan ; skill `python-patterns` si besoin |
-| Tests | skill `tdd-workflow` + skill `python-testing` |
+| Code backend | rules `python/*` ; skill `python-patterns` si besoin |
+| Tests | skill `tdd-workflow` + skill `python-testing` (backend), Vitest/Playwright (frontend), Jest (mobile) |
 | Migration DB | skill `database-migrations` |
-| Avant PR | agent `python-reviewer` puis `code-reviewer` ; `/code-review` |
+| Avant PR | agent `python-reviewer` / `typescript-reviewer` puis `code-reviewer` ; `/code-review` |
 | Avant deploy | agent `security-reviewer` ou `/security-review` |
-| Fin session | `/save` (auto-rappele par hook Stop) — ecrit dans `cerveau/wiki/Daily/` |
+| Deploy / verif prod | skills galisse-ops (`ops-deploy`, `ops-status`) |
 
 ## CI GitHub Actions — submodules privés
 
@@ -63,11 +61,10 @@ Le vault `C:\dev\cerveau` est la memoire externe (cf `~/.claude/CLAUDE.md` pour 
 
 ## Regles absolues
 
-1. **Ne JAMAIS inventer** d'information absente du repo ou du vault — signaler quand la donnee manque
-2. **Ne JAMAIS modifier `C:\dev\cerveau\raw\`** (espace humain immutable)
-3. **Workflow lean** : pas de fichier `.md` de rapport gratuit, pas de commentaire de code superflu
-4. **Reponses en francais** (parametre global `language: Francais`)
+1. **Ne JAMAIS inventer** d'information absente du repo — signaler quand la donnee manque
+2. **Workflow lean** : pas de fichier `.md` de rapport gratuit, pas de commentaire de code superflu
+3. **Reponses en francais**
 
 ## Source des skills/agents/rules
 
-Les composants `.claude/{rules,skills,agents,commands}/` viennent de [everything-claude-code v2.0.0-rc.1](https://github.com/affaan-m/everything-claude-code) (cache local `~/.claude/plugins/cache/everything-claude-code/...`). Le plugin global est **disabled** intentionnellement — seule cette copie locale est active sur ce workspace.
+Les composants `.claude/{rules,skills,agents,commands}/` viennent de [everything-claude-code v2.0.0-rc.1](https://github.com/affaan-m/everything-claude-code), copies et elagues pour ce projet. Le plugin ECC n'est pas installe : seule cette copie locale est active. Agents disponibles : `planner`, `code-reviewer`, `python-reviewer`, `typescript-reviewer`, `database-reviewer`, `security-reviewer`.
