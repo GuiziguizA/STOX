@@ -11,8 +11,11 @@ permissions:
 
 # Les dépôts des submodules (backend, frontend, mobile) sont privés alors que
 # STOX est public : le GITHUB_TOKEN ne peut pas les lire. Aucun job ne clone
-# donc les submodules. La vérification des pointeurs utilise le secret
-# optionnel SUBMODULES_TOKEN (PAT fine-grained, Contents: read sur les 3 dépôts).
+# donc les submodules, et les checkouts utilisent le GITHUB_TOKEN par défaut.
+# Seule la vérification des pointeurs (job submodule-sanity) utilise le secret
+# optionnel SUBMODULES_TOKEN : un PAT fine-grained, Contents: Read-only, limité
+# aux trois dépôts de submodules de GuiziguizA (backend, frontend, mobile).
+# S'il est absent, le job passe avec un avertissement.
 
 jobs:
   validate-compose:
@@ -23,7 +26,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: false
-          token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
 
       # `docker compose config` n'a pas besoin du contenu des build contexts
       # (./backend, ./frontend) mais exige les env_file : on crée un .env
@@ -86,7 +88,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: false
-          token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
 
       - name: Verify each submodule SHA exists upstream
         run: |
