@@ -51,6 +51,9 @@ Le vault `C:\dev\cerveau` est la memoire externe (cf `~/.claude/CLAUDE.md` pour 
 
 ## CI GitHub Actions — submodules privés
 
+- **Historique** : la CI a été rouge sur `master` de mai à septembre 2026 (aucun run vert). Causes : un gitlink parasite `.claude/worktrees/…` (worktree Claude commité par erreur dans 8dd6d0c, absent de `.gitmodules`) qui cassait le checkout, puis le téléchargement des submodules privés sans accès. Corrigé par la PR #3.
+- Avant d'affirmer que « ça marchait avant », vérifier qu'il existe au moins un run vert : `gh run list --branch master --status success`.
+- Ne jamais committer `.claude/worktrees/` (ignoré par `.gitignore`). Vérifier `git ls-tree -r HEAD | grep 160000` : seuls `backend`, `frontend` et `mobile` doivent apparaître.
 - Le dépôt STOX est **public**, mais ses trois submodules (`projet-action-backend`, `projet-action-frontend`, `stox-mobile`, tous chez `GuiziguizA`) sont **privés** : le `GITHUB_TOKEN` de la CI ne peut pas les lire.
 - Les checkouts de la CI utilisent le `GITHUB_TOKEN` par défaut avec `submodules: false` : les submodules ne sont jamais téléchargés, avec ou sans secret.
 - Seul le job `submodule-sanity` utilise le secret `SUBMODULES_TOKEN` (PAT fine-grained, Contents: Read-only, limité à ces trois dépôts) pour faire un `git fetch` du SHA pointé par chaque submodule. Sans ce secret, le job passe avec un avertissement (`::warning`), sans faire échouer la CI.
