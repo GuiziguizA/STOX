@@ -6,8 +6,6 @@ description: Restate requirements, assess risks, and create step-by-step impleme
 
 This command creates a comprehensive implementation plan before writing any code.
 
-Run inline by default. Do not call the Task tool or any subagent by default. This keeps `/plan` usable from plugin installs that ship commands without agent files.
-
 ## What This Command Does
 
 1. **Restate Requirements** - Clarify what needs to be built
