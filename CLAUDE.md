@@ -49,6 +49,14 @@ Le vault `C:\dev\cerveau` est la memoire externe (cf `~/.claude/CLAUDE.md` pour 
 | Avant deploy | agent `security-reviewer` ou `/security-review` |
 | Fin session | `/save` (auto-rappele par hook Stop) — ecrit dans `cerveau/wiki/Daily/` |
 
+## CI GitHub Actions — submodules privés
+
+- Le dépôt STOX est **public**, mais ses trois submodules (`projet-action-backend`, `projet-action-frontend`, `stox-mobile`, tous chez `GuiziguizA`) sont **privés** : le `GITHUB_TOKEN` de la CI ne peut pas les lire.
+- La CI y accède via le secret `SUBMODULES_TOKEN` : un PAT fine-grained en lecture seule (Contents: Read-only) limité à ces trois dépôts. **Il expire** : penser à le renouveler (même nom de secret).
+- Sans ce secret, le checkout des submodules est sauté et la vérification des pointeurs de submodules est ignorée avec un avertissement (`::warning`), sans faire échouer la CI.
+- Avant de conclure qu'une PR casse la CI, vérifier si `master` échoue déjà : `gh run list --branch master`.
+- Tout nouveau workflow qui fait un checkout doit gérer les submodules privés (`submodules: false`, ou accès via `SUBMODULES_TOKEN`), sinon il échoue au checkout.
+
 ## Regles absolues
 
 1. **Ne JAMAIS inventer** d'information absente du repo ou du vault — signaler quand la donnee manque
