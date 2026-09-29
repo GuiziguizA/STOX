@@ -15,3 +15,4 @@
 .claude/settings.local.json
 .claude/sessions/
 .claude/.mcp-cache/
+.claude/worktrees/
