@@ -20,6 +20,8 @@
 #   CORS_ORIGINS=https://<FQDN_GENERE_PAR_COOLIFY>
 #   FRONTEND_URL=https://<FQDN_GENERE_PAR_COOLIFY>
 #   FMP_API_KEY=<optionnel>
+#   SERVICE_API_TOKEN=<optionnel, >= 32 car. ; vide = /api/v1/service/* en 404>
+#   SERVICE_USER_EMAIL=<optionnel, compte servi par /api/v1/service/*>
 #   SERVICE_FQDN_PROXY_80=/          # Coolify genere le FQDN
 #
 # Si pas de domaine TLS encore : laisser APP_ENV=development pour eviter le
@@ -87,6 +89,8 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS}
       FRONTEND_URL: ${FRONTEND_URL}
       FMP_API_KEY: ${FMP_API_KEY:-}
+      SERVICE_API_TOKEN: ${SERVICE_API_TOKEN:-}
+      SERVICE_USER_EMAIL: ${SERVICE_USER_EMAIL:-}
     networks:
       - app-net
     depends_on:
